@@ -1,1 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>選股儀表板</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EEF1F4;--surface:#FFFFFF;--ink:#1B2430;--muted:#66707C;--line:#D6DCE3;--accent:#22436B;--accent-soft:#DCE6F2;--up:#C62D2D;--down:#1A7F46;--off:#E2E6EB;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#12171D;--surface:#1B222B;--ink:#E6EAF0;--muted:#8B95A1;--line:#2C3541;--accent:#8DB2DE;--accent-soft:#233349;--up:#F0605A;--down:#3DBB75;--off:#2A323D}}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-variant-numeric:tabular-nums}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:14px 16px 8px;border-bottom:1px solid var(--line)}
+h1{font-size:22px;margin:0}
+.meta{color:var(--muted);font-size:13px}
+.row-scroll{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+.row-scroll::-webkit-scrollbar{display:none}
+button{font:inherit;color:inherit;cursor:pointer}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:14px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.tools{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:8px;font-size:14px}
+.tools button{background:none;border:0;color:var(--accent);padding:4px 0}
+select{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+#filters{display:none;padding:8px 0 4px}#filters.open{display:block}
+.group{margin-top:8px}.group h2{font-size:13px;font-weight:500;color:var(--muted);margin:0 0 6px}
+.group .wrap{display:flex;flex-wrap:wrap;gap:6px}
+main{padding:8px 12px 32px;max-width:720px;margin:0 auto}
+.count{color:var(--muted);font-size:13px;padding:6px 4px}
+.stock{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.stock>button{display:grid;grid-template-columns:1fr auto;gap:4px 12px;width:100%;text-align:left;background:none;border:0;padding:12px 14px}
+.name{font-weight:700;font-size:16px}.name small{font-weight:400;color:var(--muted);margin-left:6px;font-size:13px}
+.price{text-align:right;font-weight:700;font-size:16px}.price small{display:block;font-size:13px;font-weight:500}
+.up{color:var(--up)}.down{color:var(--down)}
+.meter{display:flex;gap:3px;align-items:center}.meter i{width:14px;height:6px;border-radius:2px;background:var(--off)}
+.meter i.on{background:var(--accent)}.meter b{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
+.themes{font-size:12px;color:var(--muted);text-align:right;align-self:center}
+.detail{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}.stock.open .detail{display:block}
+svg.spark{width:100%;height:56px;display:block;margin:10px 0 4px}
+.flags{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}
+.flags span{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px}
+dl{display:grid;grid-template-columns:repeat(2,1fr);gap:0 16px;margin:0}
+dl div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0;font-size:14px}
+dt{color:var(--muted)}dd{margin:0;font-weight:500}
+h3{font-size:13px;font-weight:500;color:var(--muted);margin:12px 0 2px}
+.empty{text-align:center;color:var(--muted);padding:48px 16px}
+.note{color:var(--muted);font-size:12px;text-align:center;margin-top:16px}
+@media (max-width:380px){dl{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>選股儀表板</h1>
+  <div class="meta" id="meta"></div>
+  <div class="row-scroll" id="themes"></div>
+  <div class="tools">
+    <button id="toggle">篩選條件</button>
+    <label>排序
+      <select id="sort">
+        <option value="score">符合條件數</option>
+        <option value="chg">今日漲跌</option>
+        <option value="rev_yoy">營收年增</option>
+        <option value="trust5">投信5日買超</option>
+        <option value="foreign5">外資5日買超</option>
+        <option value="vol_ratio">量比</option>
+      </select>
+    </label>
+  </div>
+  <div id="filters"></div>
+</header>
+<main>
+  <div class="count" id="count"></div>
+  <div id="list"></div>
+  <p class="note">資料來源 FinMind，僅供研究參考。</p>
+</main>
+<script>
+const D = __DATA__;
+const GROUPS = {"技術面":["多頭排列","量價突破"],"籌碼":["外資買超","投信買超","投信連買","融資減少"].concat(D.broker?["分點集中"]:[]),"基本面":["營收年增20%","EPS年增"]};
+const ALL = Object.values(GROUPS).flat();
+const state = {theme:"全部",flags:new Set(),sort:"score",open:new Set()};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v,d=0,suf="") => v==null ? "–" : Number(v).toLocaleString("zh-TW",{minimumFractionDigits:d,maximumFractionDigits:d})+suf;
+const signed = (v,d=0,suf="") => v==null ? "–" : (v>0?"+":"")+num(v,d,suf);
+const tone = v => v>0 ? "up" : v<0 ? "down" : "";
+$("meta").textContent = D.stocks.length ? `資料日 ${D.date}．更新於 ${D.generated}` : `更新於 ${D.generated}`;
+function renderThemes(){
+  $("themes").innerHTML = ["全部",...D.themes].map(t=>`<button class="chip" aria-pressed="${t===state.theme}" data-t="${esc(t)}">${esc(t)}</button>`).join("");
+}
+function renderFilters(){
+  $("filters").innerHTML = Object.entries(GROUPS).map(([g,fs])=>`<div class="group"><h2>${g}</h2><div class="wrap">${fs.map(f=>`<button class="chip" aria-pressed="${state.flags.has(f)}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}</div></div>`).join("")+`<div class="group"><div class="wrap"><button class="chip" data-clear>清除條件</button></div></div>`;
+}
+function spark(arr){
+  const p=(arr||[]).filter(v=>v!=null); if(p.length<2) return "";
+  const lo=Math.min(...p),hi=Math.max(...p),w=300,h=56;
+  const xy=p.map((v,i)=>`${(i/(p.length-1)*w).toFixed(1)},${(h-4-(v-lo)/((hi-lo)||1)*(h-8)).toFixed(1)}`).join(" ");
+  const c=p[p.length-1]>=p[0]?"var(--up)":"var(--down)";
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${xy}" fill="none" stroke="${c}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+const cell=(k,v,cls="")=>`<div><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`;
+function detail(s){
+  const br=(s.top_buyers||[]).map(([n,v])=>`${esc(n)} ${num(v)}張`).join("、");
+  return `${spark(s.spark)}<div class="flags">${s.flags.map(f=>`<span>${esc(f)}</span>`).join("")||"<span>無符合條件</span>"}</div>
+  <h3>技術面</h3><dl>${cell("月線",num(s.ma20,2))}${cell("季線",num(s.ma60,2))}${cell("成交量",num(s.vol,0," 張"))}${cell("量比",num(s.vol_ratio,2))}</dl>
+  <h3>籌碼（近 5 日，張）</h3><dl>${cell("外資",signed(s.foreign5),tone(s.foreign5))}${cell("投信",signed(s.trust5),tone(s.trust5))}${cell("自營商",signed(s.dealer5),tone(s.dealer5))}${cell("投信連買",num(s.trust_streak,0," 日"))}${cell("融資增減",signed(s.margin_chg5),tone(s.margin_chg5))}${cell("券資比",num(s.short_ratio,1,"%"))}${D.broker?cell("分點集中度",num(s.conc,1,"%")):""}</dl>
+  ${br?`<h3>主力買超分點</h3><p style="margin:4px 0;font-size:14px">${br}</p>`:""}
+  <h3>基本面</h3><dl>${cell(`營收 ${esc(s.rev_month||"")}`,num(s.rev,2," 億"))}${cell("營收 YoY",signed(s.rev_yoy,1,"%"),tone(s.rev_yoy))}${cell("營收 MoM",signed(s.rev_mom,1,"%"),tone(s.rev_mom))}${cell("YoY 連增",num(s.rev_streak,0," 月"))}${cell(`EPS ${esc(s.eps_q||"")}`,num(s.eps,2))}${cell("去年同季",num(s.eps_prev,2))}${cell("近四季 EPS",num(s.eps_ttm,2))}</dl>`;
+}
+function render(){
+  let rows=D.stocks.filter(s=>(state.theme==="全部"||s.themes.includes(state.theme))&&[...state.flags].every(f=>s.flags.includes(f)));
+  const k=state.sort; rows.sort((a,b)=>(b[k]??-Infinity)-(a[k]??-Infinity)||(b.chg??0)-(a.chg??0));
+  $("count").textContent=`${rows.length} 檔`+(state.flags.size?`，同時符合：${[...state.flags].join("、")}`:"");
+  if(!D.stocks.length){$("list").innerHTML=`<p class="empty">還沒有資料。檢查 themes.json 與 FINMIND_TOKEN 後重新執行。</p>`;return}
+  if(!rows.length){$("list").innerHTML=`<p class="empty">沒有股票同時符合這些條件，試著少選一個。</p>`;return}
+  $("list").innerHTML=rows.map(s=>{const o=state.open.has(s.id);
+    return `<article class="stock${o?" open":""}"><button data-id="${esc(s.id)}">
+    <span class="name">${esc(s.name)}<small>${esc(s.id)}</small></span>
+    <span class="price ${tone(s.chg)}">${num(s.close,2)}<small>${signed(s.chg,2,"%")}</small></span>
+    <span class="meter">${ALL.map(f=>`<i class="${s.flags.includes(f)?"on":""}"></i>`).join("")}<b>${s.score}/${ALL.length}</b></span>
+    <span class="themes">${esc(s.themes.join("、"))}</span></button>
+    <div class="detail">${o?detail(s):""}</div></article>`}).join("");
+}
+$("themes").onclick=e=>{const b=e.target.closest("[data-t]");if(!b)return;state.theme=b.dataset.t;renderThemes();render()};
+$("filters").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.hasAttribute("data-clear"))state.flags.clear();else{const f=b.dataset.f;state.flags.has(f)?state.flags.delete(f):state.flags.add(f)}renderFilters();render()};
+$("toggle").onclick=e=>{const o=$("filters").classList.toggle("open");e.currentTarget.textContent=o?"收起條件":"篩選條件"};
+$("sort").onchange=e=>{state.sort=e.target.value;render()};
+$("list").onclick=e=>{const b=e.target.closest("[data-id]");if(!b)return;const id=b.dataset.id;state.open.has(id)?state.open.delete(id):state.open.add(id);render()};
+renderThemes();renderFilters();render();
+</script>
+</body>
+</html>
 
