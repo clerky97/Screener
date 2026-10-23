@@ -2,7 +2,10 @@
   "mcpServers": {
     "toalpha": {
       "type": "http",
-      "url": "https://toalpha.tw/mcp"
+      "url": "https://toalpha.tw/mcp",
+      "headers": {
+        "Authorization": "Bearer ${TOALPHA_API_KEY}"
+      }
     }
   }
 }
