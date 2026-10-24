@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 
 API = "https://api.finmindtrade.com/api/v4"
-TOKEN = os.environ.get("FINMIND_TOKEN", "").strip()
+TOKEN = os.environ.get("FINMIND_TOKEN", "").strip().lstrip("=")
 USE_BROKER = os.environ.get("USE_BROKER", "0") == "1"
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "docs" / "index.html"
